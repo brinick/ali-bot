@@ -9,7 +9,7 @@ that.
 from collections import namedtuple
 import os
 
-from github.util import github_token
+from github.util import github_token, github_datetime, utf8
 from github.client import GithubCachedClient, PickledCache
 
 
@@ -204,15 +204,15 @@ class PullRequest(RepoObject):
 
     def __init__(self, repo_owner, repo_name, **kws):
         super(PullRequest, self).__init__(repo_owner, repo_name)
-        self.title = kws.get("title", "")
+        self.title = utf8(kws.get("title", ""))
         self.state = kws.get("state")
         self.number = kws.get("number")
-        self.author = kws.get("user", {}).get("login", "")
-        self.opened_at = kws.get("created_at")
-        self.updated_at = kws.get("updated_at")
+        self.author = utf8(kws.get("user", {}).get("login", ""))
+        self.opened_at = github_datetime(kws.get("created_at"))
+        self.updated_at = github_datetime(kws.get("updated_at"))
         self.url = kws.get("html_url")
         self.is_open = (self.state == "open")
-        self.closed_at = kws.get("closed_at")
+        self.closed_at = github_datetime(kws.get("closed_at"))
         self._head = None
 
     def commits(self):
@@ -253,10 +253,10 @@ class Commit(RepoObject):
     def __init__(self, repo_owner, repo_name, **kws):
         super(Commit, self).__init__(repo_owner, repo_name)
         self.sha = kws.get("sha")
-        self.author = kws["commit"]["author"]["name"]
+        self.author = utf8(kws["commit"]["author"]["name"])
         self.author_email = kws["commit"]["author"]["email"]
-        self.message = kws["commit"]["message"]
-        self.created_at = kws["commit"]["author"]["date"]
+        self.message = utf8(kws["commit"]["message"])
+        self.created_at = github_datetime(kws["commit"]["author"]["date"])
         self._files = None
 
     def statuses(self, context=None):
@@ -309,9 +309,9 @@ class CommitStatus(RepoObject):
         self.target_url = kws.get("target_url", "")
         self.description = kws.get("description", "")
         creator = kws.get("creator", {})
-        self.author = creator.get("login")
-        self.created_at = kws.get("created_at")
-        self.updated_at = kws.get("updated_at")
+        self.author = utf8(creator.get("login"))
+        self.created_at = github_datetime(kws.get("created_at"))
+        self.updated_at = github_datetime(kws.get("updated_at"))
         self.commit_sha = os.path.basename(kws.get("url", ""))
 
     def to_dict(self):
@@ -348,16 +348,16 @@ class Issue(RepoObject):
 
     def __init__(self, repo_owner, repo_name, **kws):
         super(Issue, self).__init__(repo_owner, repo_name)
-        assignees = [a.get("login") for a in kws.get("assignees")]
+        assignees = [utf8(a.get("login")) for a in kws.get("assignees")]
         self.assignees = [a for a in assignees if a]
-        self.author = kws.get("user", {}).get("login")
-        self.body = kws.get("body")
-        self.closed_at = kws.get("closed_at")
-        self.created_at = kws.get("created_at")
-        self.updated_at = kws.get("updated_at")
+        self.author = utf8(kws.get("user", {}).get("login"))
+        self.body = utf8(kws.get("body"))
+        self.created_at = github_datetime(kws.get("created_at"))
+        self.updated_at = github_datetime(kws.get("updated_at"))
+        self.closed_at = github_datetime(kws.get("closed_at"))
         self.number = kws.get("number")
         self.state = kws.get("state")
-        self.title = kws.get("title")
+        self.title = utf8(kws.get("title"))
 
     @property
     def comments(self):
@@ -378,11 +378,11 @@ class Issue(RepoObject):
 class IssueComment(RepoObject):
     def __init__(self, repo_owner, repo_name, **kws):
         super(IssueComment, self).__init__(repo_owner, repo_name)
-        self.body = kws.get("body", "")
+        self.body = utf8(kws.get("body", ""))
         self.id = kws.get("id")
-        self.created_at = kws.get("created_at")
-        self.updated_at = kws.get("updated_at")
-        self.author = kws.get("user", {}).get("login")
+        self.created_at = github_datetime(kws.get("created_at"))
+        self.updated_at = github_datetime(kws.get("updated_at"))
+        self.author = utf8(kws.get("user", {}).get("login"))
         self.url = kws.get("url")
 
     def update(self, **kws):
@@ -420,7 +420,7 @@ class Teams(IGithub):
 
 class Team(IGithub):
     def __init__(self, **kws):
-        self.name = kws.get("name")
+        self.name = utf8(kws.get("name"))
         self.id = kws.get("id")
         self.url_base = "/teams/{0}".format(self.id)
         super(Team, self).__init__()
@@ -442,7 +442,7 @@ class Team(IGithub):
 
 class TeamMember(object):
     def __init__(self, **kws):
-        self.name = kws.get("login")
+        self.name = utf8(kws.get("login"))
         self.id = kws.get("id")
 
     def __repr__(self):

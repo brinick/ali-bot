@@ -1,11 +1,13 @@
 """A collection of useful Git(hub) related functions"""
 
-from collections import OrderedDict
+from collections import namedtuple, OrderedDict
+import datetime
 from hashlib import sha1
 import inspect
 import os
 import re
 import sys
+import time
 
 
 def github_token():
@@ -13,6 +15,10 @@ def github_token():
         return os.environ["GITHUB_TOKEN"]
     except KeyError:
         raise RuntimeError("GITHUB_TOKEN env var not found, please set it")
+
+
+def utf8(s):
+    return s.encode("utf-8")
 
 
 def generateCacheId(entries):
@@ -38,6 +44,51 @@ def parseGithubRef(s):
     commit_ref = s.split("@")[1] if "@" in s else "master"
     pr_n = re.split("[@#]", s)[1] if "#" in s else None
     return (repo_name, pr_n, commit_ref)
+
+
+def github_datetime(utc_dt_str):
+    def _utc_hours_offset():
+        local_now_hour = time.localtime().tm_hour
+        utc_now_hour = time.gmtime().tm_hour
+        return local_now_hour - utc_now_hour
+
+    def _to_utc_timetuple(utc_dt_str):
+        utc_regex = re.compile(("(\d{4})-"  # year
+                                "(\d{2})-"  # month
+                                "(\d{2})"   # day
+                                "T"
+                                "(\d{2}):"  # hour
+                                "(\d{2}):"  # mins
+                                "(\d{2})"   # secs
+                                "Z"))
+        dt_info = utc_regex.match(utc_dt_str).groups()
+        return tuple([int(i) for i in dt_info])
+
+    def _to_datetime(utc_str, as_utc=False):
+        if utc_str is None:
+            return None
+
+        utc_tt = _to_utc_timetuple(utc_str)
+        dt = datetime.datetime(*utc_tt)
+        if not as_utc:
+            # get as local time
+            dt += datetime.timedelta(hours=_utc_hours_offset())
+        return dt
+
+    def _to_epoch(dt):
+        return int(dt.strftime("%s"))
+
+    GithubDateTime = namedtuple("GithubDateTime", "epoch epoch_utc dt dt_utc")
+
+    if utc_dt_str is None:
+        return GithubDateTime(None, None, None, None)
+
+    local_dt = _to_datetime(utc_dt_str, as_utc=False)
+    utc_dt = _to_datetime(utc_dt_str, as_utc=True)
+    local_epoch = _to_epoch(local_dt)
+    utc_epoch = _to_epoch(utc_dt)
+
+    return GithubDateTime(local_epoch, utc_epoch, local_dt, utc_dt)
 
 
 def trace(func):

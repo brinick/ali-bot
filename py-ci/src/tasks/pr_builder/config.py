@@ -35,6 +35,7 @@ pr_fetch = {
 # pull request handling
 # ------------------------------------------------------
 alibuild = {
+    "executable": "alibuild/aliBuild",
     "repo": env("ALIBUILD_REPO"),
     "defaults": env("ALIBUILD_DEFAULTS", "release"),
     "o2_tests": env("ALIBUILD_O2_TESTS", 0),
@@ -44,6 +45,9 @@ alibuild = {
     "no_consistent_externals": env("NO_ASSUME_CONSISTENT_EXTERNALS", "")
 }
 
+alidoctor = {
+    "executable": "alibuild/aliDoctor"
+}
 
 pr_handle = {
     "mirror": env("MIRROR", "/build/mirror"),
@@ -80,5 +84,6 @@ monalisa = {
 # terminate them
 process_timeout = {
     "alidoctor": env("ALIDOCTOR_PROCESS_TIMEOUT", 120),
-    "alibuild": env("ALIBUILD_PROCESS_TIMEOUT", 3600)
+    "alibuild": env("ALIBUILD_PROCESS_TIMEOUT", 3600),
+    "git_pull": env("GIT_PULL_TIMEOUT", 120)
 }

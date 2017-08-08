@@ -31,24 +31,16 @@ class PRHandlerTask(Task):
 
     def run(self):
         self.setStart()
-        self.log.debug("Handling PR {0}".format(self.pr["number"]))
-        time.sleep(7)
-        return
+        self.init_vars()
+        self.init_github_status_alidist()
 
-        self.prepare()
-
-        mergedOK = self.do_merge()
-        if mergedOK:
-            doctorOK = self.run_alidoctor()
-
-            if doctorOK:
-                self.run_alibuild()
+        if self.update_local_git_repos() and self.do_merge():
+            if self.run_alidoctor() and self.run_alibuild():
                 metrics.send("pr_build_time", self.active_since)
 
-    def prepare(self):
-        """In preparation for merging and building, set some env vars,
-        some attributes, update the local git repositories and report
-        a pending status to github.
+    def init_vars(self):
+        """In preparation for merging and building, set some env vars
+        and attributes.
         """
         # analytics.report_screenview("pr_processing_start")
         # metrics.send("state", "pr_processing_start")
@@ -69,12 +61,15 @@ class PRHandlerTask(Task):
         self.check_name = cfg.pr_handle["check_name"]
         self.build_suffix = cfg.build_suffix
 
+    def init_github_status_alidist(self):
+        """Grab the alidist HEAD commit and update the Github status
+        for it to pending.
+        """
         with pushd("alidist"):
             self.alidist_ref = git("rev-parse", "--verify", "HEAD").strip()
 
         commit = "alisw/alidist@{0}".format(self.alidist_ref)
         ghstatus.set_to(commit, self.status("pending"))
-        self.update_git_repos()
 
     def run_alidoctor(self):
         """Run aliDoctor in its own process, and return a boolean
@@ -83,7 +78,7 @@ class PRHandlerTask(Task):
         We do not report success because that's a given.
         """
         args = self._construct_alidoctor_args()
-        doctor = cmds.AliDoctor(*args)
+        doctor = cmds.Command(cfg.alidoctor["executable"], *args)
         result = self._run_in_process(doctor,
                                       timeout=cfg.process_timeout["alidoctor"])
         doctorOK = result["ok"]
@@ -104,14 +99,14 @@ class PRHandlerTask(Task):
         self.log.debug("alibuild args are:\n{0}".format(args))
         return True
 
-        alibuild = cmds.AliBuild("alibuild/aliBuild",
-                                 *args,
-                                 ALIBUILD_HEAD_HASH=self.pr_sha,
-                                 ALIBUILD_BASE_HASH=self.upstream_sha,
-                                 # reset from the process environment
-                                 GITLAB_USER="",
-                                 GITLAB_PASS="",
-                                 GITLAB_TOKEN="")
+        alibuild = cmds.Command(cfg.alibuild["executable"],
+                                *args,
+                                ALIBUILD_HEAD_HASH=self.pr_sha,
+                                ALIBUILD_BASE_HASH=self.upstream_sha,
+                                # reset from the process environment
+                                GITLAB_USER="",
+                                GITLAB_PASS="",
+                                GITLAB_TOKEN="")
 
         result = self._run_in_process(alibuild,
                                       timeout=cfg.process_timeout["alibuild"])
@@ -148,7 +143,7 @@ class PRHandlerTask(Task):
         setenv("ALIBOT_ANALYTICS_ARCHITECTURE", "slc7_x86-64")
         setenv("ALIBOT_ANALYTICS_APP_NAME", "continuous-builder.py")
 
-    def update_git_repos(self):
+    def update_local_git_repos(self):
         """Run a git pull origin on all local git repositories if they
         are on a branch.
         """
@@ -161,7 +156,25 @@ class PRHandlerTask(Task):
             with pushd(git_dir):
                 # Only update projects on a branch
                 if self.isBranchRepo():
-                    git.pull("origin")
+                    # Not as elegant as the git.pull('origin')
+                    # but we need to timeout protect in case a git pull hangs
+                    cmd = cmds.Command("git", "pull", "origin")
+                    git_pull_timeout = cfg.process_timeout["git_pull"]
+                    result = self._run_in_process(cmd,
+                                                  timeout=git_pull_timeout)
+                    if result["timed_out"]:
+                        m = "{0}: git pull origin command timed out ({1}s), "
+                        m += "dropping PR"
+                        m = m.format(git_dir, git_pull_timeout)
+                        self.log.error(m)
+                        return False
+                    elif not result["ok"]:
+                        m = "{0}: git pull origin command failed:\n{1}\n{2}"
+                        m = m.format(git_dir, result["out"], result["err"])
+                        self.log.error(m)
+                        return False
+
+        return True
 
     def status_ref(self):
         commit = self.pr_repo
@@ -387,10 +400,12 @@ class PRHandlerTask(Task):
         forked_cmd.start()
 
         result = None
+        timed_out = False
 
         if timeout and is_positive_int(timeout):
             forked_cmd.join(int(timeout))
             if forked_cmd.is_alive():
+                timed_out = True
                 try:
                     result = results_queue.get(timeout=3)
                 except Queue.Empty:
@@ -429,6 +444,8 @@ class PRHandlerTask(Task):
             forked_cmd.join()
 
         self.remove_child_task(forked_cmd)
+
+        result["timed_out"] = timed_out
         return result
 
     def _get_size(self):

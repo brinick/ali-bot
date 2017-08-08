@@ -1,4 +1,3 @@
-import functools
 import os
 import time
 
@@ -51,12 +50,17 @@ class ForkedCommand(tasks.Task):
 
 
 class Command(object):
-    """Run a sh.Command in the shell"""
+    """Run a sh.Command"""
 
     def __init__(self, executable, *args, **envs):
-        # executable should be an instance of sh.Command
+        """Pass in the name of a system executable e.g ls,
+        or the path to a local executable, and any arguments
+        with which it should be invoked. If envs are provided
+        they will be exported within the sub-shell prior to
+        invoking the command.
+        """
         self.name = os.path.basename(executable.__name__)
-        self.executable = executable
+        self.executable = ShellCommand(executable)
         self.args = args
         self.envs = envs
 
@@ -88,17 +92,3 @@ class Command(object):
         self._exec()
         self.post_exec()
         return self.ok
-
-
-def _alidoctor_cmd():
-    aliDoctor = ShellCommand("alibuild/aliDoctor")
-    return functools.partial(Command, aliDoctor)
-
-
-def _alibuild_cmd():
-    aliBuild = ShellCommand("alibuild/aliBuild")
-    return functools.partial(Command, aliBuild)
-
-
-AliDoctor = _alidoctor_cmd()
-AliBuild = _alibuild_cmd()

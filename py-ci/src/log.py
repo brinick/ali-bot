@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import functools
 import multiprocessing
@@ -37,6 +38,7 @@ def stop():
     logging_process.terminate()
 
 
+@contextlib.contextmanager
 def ging():
     """Context manager to start and stop the logging background process.
     For nerdy fun, it is recommended to call this with its namespace prefix
@@ -66,7 +68,7 @@ class LogAccumulator(multiprocessing.Process):
             while not logging_queue.empty():
                 lines.append(logging_queue.get())
             self.dump(lines)
-            time.sleep(3)
+            time.sleep(1)
 
     def dump(self, lines):
         if not lines:

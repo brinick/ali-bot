@@ -270,7 +270,7 @@ def get_kw_args():
         "max_wait_no_new_prs": cfg.pr_fetch["max_wait_no_new_prs"],
         "max_wait_no_prs": cfg.pr_fetch["max_wait_no_prs"],
         "branch": "{0}@{1}".format(cfg.pr["repo"], cfg.pr["branch"]),
-        "check_name": cfg.check_name,
+        "check_name": cfg.pr_handle["check_name"],
         "trust_collaborators": cfg.trust["collaborators"],
         "trusted": cfg.trust["users"],
         "workers_pool_size": cfg.workers_pool_size,

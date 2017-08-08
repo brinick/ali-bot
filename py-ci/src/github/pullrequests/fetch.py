@@ -264,8 +264,10 @@ class PRFetcher(object):
         not_tested = []
         tested_fail = []
         tested_success = []
+        unreviewed = []
         for p in pulls:
             if not p["reviewed"]:
+                unreviewed.append(str(p["number"]))
                 continue
 
             if not p["tested"]:
@@ -275,6 +277,11 @@ class PRFetcher(object):
                     tested_success.append(p)
                 else:
                     tested_fail.append(p)
+
+        if unreviewed:
+            print(
+                "Ignoring unreviewed PRs: {0}".format(", ".join(unreviewed))
+            )
 
         return {
             "not_tested": not_tested,

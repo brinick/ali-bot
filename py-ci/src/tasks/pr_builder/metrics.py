@@ -21,7 +21,6 @@ def send(name, value):
     module-level metrics_queue. It will be retrieved
     by the PRMetricsTask process and forwarded to MonaLisa.
     """
-    global metrics_queue
     metrics_queue.put({"name": name, "value": value})
 
 

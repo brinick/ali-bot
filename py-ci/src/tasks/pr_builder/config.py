@@ -3,8 +3,8 @@
 import os
 
 
-def env(key):
-    return os.environ.get(key)
+def env(key, default=None):
+    return os.environ.get(key, default)
 
 
 ci_name = env("CI_NAME", "")
@@ -71,4 +71,14 @@ workers_pool_size = env("WORKERS_POOL_SIZE", 1)
 monalisa = {
     "host": env("MONALISA_HOST"),
     "port": env("MONALISA_PORT")
+}
+
+# ------------------------------------------------------
+# process timeouts
+# ------------------------------------------------------
+# Max wait for the given child processes, after which we will
+# terminate them
+process_timeout = {
+    "alidoctor": env("ALIDOCTOR_PROCESS_TIMEOUT", 120),
+    "alibuild": env("ALIBUILD_PROCESS_TIMEOUT", 3600)
 }

@@ -75,6 +75,7 @@ class PRFetcherTask(Task):
             # In principle the parent main process will notice
             # this fetcher has died, and will restart it.
             self.shutdown = True
+            self.logger.warning("Caught SystemExit trying to fetch PRs")
             prs = []
 
         # This may of course contain previously seen pull requests
@@ -118,8 +119,8 @@ class PRFetcherTask(Task):
         so that we can use this in later metrics calculations.
         """
         now = int(time.time())
-        for np in new_prs:
-            np["fetched"] = now
+        for priority, pr in new_prs:
+            pr["fetched"] = now
         return new_prs
 
     def _handle_new_prs(self, new_prs):
@@ -139,7 +140,7 @@ class PRFetcherTask(Task):
         last update time on Github, and the time when it was fetched
         here. This should be as small as possible.
         """
-        for pr in new_prs:
+        for priority, pr in new_prs:
             t1 = int(pr["updated"] or pr["created"])
             t2 = int(pr["fetched"])
             metrics.send("time_to_fetch", (t2 - t1))

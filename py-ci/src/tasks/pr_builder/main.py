@@ -7,7 +7,7 @@ import time
 from tasks import Task, PriorityQueue
 from tasks.pr_builder.fetch import PRFetcherTask
 from tasks.pr_builder.handle import PRHandlerTask
-from tasks.pr_builder.metrics import PRMetricsTask
+import tasks.pr_builder.metrics as metrics
 
 
 class Main(Task):
@@ -38,10 +38,7 @@ class Main(Task):
                 self.restart_fetcher_process()
         else:
             self.fetch_new_prs()
-            if not self.higher_priority_pr_pending():
-                self.log.debug("No higher priority pull requests found")
-            else:
-                self.log.debug("There is a higher priority PR to process")
+            if self.higher_priority_pr_pending():
                 self.shutdown_ongoing_pr_build()
                 self.launch_next_pr_build()
 
@@ -77,8 +74,9 @@ class Main(Task):
     def launch_metrics_collect_process(self):
         child_proc_name = "pr_builder.metrics"
         queue_pair = self.messages.create_queue_pair(name=child_proc_name)
-        self.task_metrics = PRMetricsTask(child_proc_name,
-                                          message_queue_pair=queue_pair)
+        metrics.start()
+        self.task_metrics = metrics.PRMetricsTask(child_proc_name,
+                                                  message_queue_pair=queue_pair)
         self.task_metrics.start()
         self.child_tasks.append(self.task_metrics)
 
@@ -109,20 +107,30 @@ class Main(Task):
         if not next_pr:
             # There are no new prs so keep on doing
             # what we are currently doing
-            self.log.debug("next_pr is None")
+            m = "Pull request queue is empty, "
+            if self.current_pr:
+                m += "keep testing #{0}"
+                m = m.format(self.current_pr["number"])
+            else:
+                m += "not currently testing a PR either. Nothing to do."
+            self.log.debug(m)
             return False
 
         if not self.current_pr:
             # No pull request is being currently built, so let
             # us launch the next one
-            self.log.debug("current_pr is None")
+            m = "Not currently testing a PR, grabbing one from queue (#{0})"
+            m = m.format(next_pr[1]["number"])
+            self.log.debug(m)
             return True
 
         if self.task_pr_handler and not self.task_pr_handler.is_alive():
             # Current build is over, so let us launch the next one.
             # First however, we pop the previous reference from the
             # child tasks list
-            self.log.debug("previous build is done")
+            m = "Finished with PR #{0}, launching #{1}"
+            m = m.format(self.current_pr["number"], next_pr[1]["number"])
+            self.log.debug(m)
             self.child_tasks.remove(self.task_pr_handler)
             self.task_pr_handler = None
             return True
@@ -130,9 +138,6 @@ class Main(Task):
         # Compare the ongoing build priority to the next one
         next_priority, next_pr = next_pr
         higher = (next_priority < self.current_priority)
-        self.log.debug("higher priority? " + str(higher))
-        self.log.debug("next: " + next_priority)
-        self.log.debug("current: " + self.current_priority)
         return higher
 
     def shutdown_ongoing_pr_build(self):

@@ -139,9 +139,8 @@ class Task(multiprocessing.Process):
         # log.debug('handle_parent_message received: ' + str(data))
         if data and data["exitcode"] == 0:
             func_name = "message_" + data["message"]
-            self.log.debug("This is {0}".format(self.name))
-            self.log.debug("Received data: {0}".format(data))
-            self.log.debug("Forwarding to handler {0}".format(func_name))
+            self.log.debug("Parent sent: {0}".format(data))
+            self.log.debug("Forwarding to method: {0}".format(func_name))
             try:
                 func = getattr(self, func_name)
             except AttributeError:
@@ -152,10 +151,8 @@ class Task(multiprocessing.Process):
                     func(**args)
                 except:
                     pass
-        else:
-            self.log.debug("No parent messages")
 
-    def waitForChildTasks(self, tasks, **kws):
+    def waitForChildTasks(self, *tasks, **kws):
         """Wait for the given list of tasks to finish.
         Every so-often check if there is a message
         from the parent process.
@@ -166,6 +163,16 @@ class Task(multiprocessing.Process):
             self.log.debug("Waiting on: {0}".format(", ".join(alive_kids)))
             self.handle_parent_message()
             alive_kids = [t.name for t in tasks if t.is_alive()]
+
+    def get_child_proc_info(self, kid):
+        proc = psutil.Process(kid.pid)
+        with proc.oneshot():
+            status = proc.status()
+            # handle an unresponsive proc
+            if status in ():
+                pass
+            else:
+                pass
 
     def message_list_processes(self):
         """Get the recursive list of alive processes in this task,

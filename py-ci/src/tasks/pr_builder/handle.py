@@ -31,6 +31,10 @@ class PRHandlerTask(Task):
 
     def run(self):
         self.setStart()
+        self.log.debug("Handling PR {0}".format(self.pr["number"]))
+        time.sleep(7)
+        return
+
         self.prepare()
 
         mergedOK = self.do_merge()
@@ -80,7 +84,8 @@ class PRHandlerTask(Task):
         """
         args = self._construct_alidoctor_args()
         doctor = cmds.AliDoctor(*args)
-        result = self._run_in_process(doctor)
+        result = self._run_in_process(doctor,
+                                      timeout=cfg.process_timeout["alidoctor"])
         doctorOK = result["ok"]
         if not doctorOK:
             self._report_alidoctor_failure()
@@ -108,7 +113,8 @@ class PRHandlerTask(Task):
                                  GITLAB_PASS="",
                                  GITLAB_TOKEN="")
 
-        result = self._run_in_process(alibuild)
+        result = self._run_in_process(alibuild,
+                                      timeout=cfg.process_timeout["alibuild"])
         buildOK = result["ok"]
         if not buildOK:
             self._report_alibuild_failure()
@@ -408,7 +414,7 @@ class PRHandlerTask(Task):
                 # Even if the command was sigkill'ed, as it's run in a
                 # sub-process the parent cmds.Forkedcommand should be able
                 # to get some info and put it on the results queue.
-                pass
+                self.log.error("No result from ForkedCommand")
 
         # Clean up
         results_queue.close()
